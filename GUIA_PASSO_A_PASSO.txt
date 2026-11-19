@@ -1,0 +1,379 @@
+=====================================================================
+GUIA PASSO A PASSO - PROJETO IoT DO ReAlimenta (para quem nunca usou IoT)
+=====================================================================
+Leia a PARTE 0 primeiro (5 minutos). Depois siga as partes na ordem.
+Cada passo termina com "DEU CERTO QUANDO" para você saber se pode seguir.
+Os nomes de botões dos sites podem mudar um pouco com o tempo; se algo
+estiver com outro nome, procure o equivalente.
+
+---------------------------------------------------------------------
+PARTE 0 - ENTENDENDO O QUE VOCÊ VAI FAZER
+---------------------------------------------------------------------
+Você NÃO precisa de nenhum componente físico. Tudo é simulado.
+
+  ESP32   = um mini computador (o "cérebro" do dispositivo).
+  Wokwi   = site que simula o ESP32 e os componentes na tela.
+  Sensor  = mede algo (aqui: temperatura da câmara fria, DHT22).
+  Atuador = faz algo (aqui: liga/desliga o cooler, o LED azul).
+  MQTT    = "correio" da internet para dispositivos: o ESP32 envia
+            e recebe mensagens.
+  ThingSpeak = site (da MathWorks) que recebe as mensagens, GUARDA os
+            dados e mostra gráficos. É a "nuvem" do projeto.
+  Canal   = uma "planilha" no ThingSpeak. Cada coluna é um "field".
+  Node-RED = programa que roda no seu computador e mostra o
+            painel (dashboard) com gráfico e botões de comando.
+
+O caminho dos dados:
+  Wokwi (ESP32) --MQTT--> ThingSpeak --internet--> Node-RED (painel)
+  Node-RED (comando) --> ThingSpeak --MQTT--> Wokwi (ESP32)
+
+ORDEM DAS PARTES E TEMPO ESTIMADO
+  1. Criar contas ............................ 15 min
+  2. Configurar o ThingSpeak ................. 20 min
+  3. Rodar o dispositivo no Wokwi ............ 30 min
+  4. Conferir os dados na nuvem .............. 5 min
+  5. Instalar e configurar o Node-RED ........ 30 min
+  6. Testar comando remoto e desconexão ...... 10 min
+  7. Gravar o vídeo .......................... 30 min
+  8. Preencher o README e entregar ........... 20 min
+Dica: o prazo é 19/11 às 23:55. Faça as partes 1 a 4 primeiro; elas são
+as que mais valem pontos. Se algo travar, vá para a PARTE 9.
+
+ANOTE ESTES DADOS NO BLOCO DE NOTAS (você vai precisar):
+  - ID do Canal 1 (Telemetria):        ______________
+  - Write API Key do Canal 1:          ______________ (só p/ teste)
+  - ID do Canal 2 (Comandos):          ______________
+  - Write API Key do Canal 2:          ______________
+  - MQTT Client ID:                    ______________
+  - MQTT Username:                     ______________
+  - MQTT Password:                     ______________
+
+---------------------------------------------------------------------
+PARTE 1 - CRIAR AS CONTAS
+---------------------------------------------------------------------
+1.1 Conta do ThingSpeak (gratuita)
+  1) Abra o navegador e entre em:  https://thingspeak.com
+  2) Clique em "Get Started For Free".
+  3) Clique em "Create one!" (criar conta MathWorks) e preencha: e-mail,
+     país, nome. Use o e-mail da FIAP ou pessoal.
+  4) Abra seu e-mail, clique no link de confirmação e crie a senha.
+  5) Volte ao thingspeak.com e faça login ("Sign In").
+  6) Se perguntar como vai usar, escolha uso pessoal/acadêmico
+     (gratuito, não comercial).
+  DEU CERTO QUANDO: você vê a página "My Channels".
+
+1.2 Conta do Wokwi (gratuita)
+  1) Entre em:  https://wokwi.com
+  2) Clique em "Sign up" / "Log in" e entre com Google, GitHub ou e-mail.
+  DEU CERTO QUANDO: aparece seu nome/foto no canto da página.
+
+1.3 (Mais tarde, para entregar) Conta do GitHub: https://github.com
+
+---------------------------------------------------------------------
+PARTE 2 - CONFIGURAR O THINGSPEAK
+---------------------------------------------------------------------
+2.1 Criar o CANAL 1 - Telemetria (o que o ESP32 ENVIA)
+  1) Menu "Channels" > "My Channels" > botão "New Channel".
+  2) Em "Name" digite:  ReAlimenta Telemetria
+  3) Marque as caixas Field 1 até Field 8 e digite os nomes:
+       Field 1: Temperatura media (C)
+       Field 2: Umidade media (%)
+       Field 3: Cooler (0 desligado, 1 ligado)
+       Field 4: Setpoint (C)
+       Field 5: Modo (0 auto, 1 ligado, 2 desligado)
+       Field 6: Estado (0 normal, 1 atencao, 2 critico, 3 falha sensor)
+       Field 7: Temperatura maxima (C)
+       Field 8: RSSI (dBm)
+  4) Role até o fim e clique em "Save Channel".
+  5) Na página do canal, anote o "Channel ID" (um número, ex.: 2812345).
+  6) Abra a aba "API Keys" e anote a "Write API Key" (só para o teste
+     da etapa 2.4).
+  DEU CERTO QUANDO: você vê 8 gráficos vazios na página do canal.
+
+2.2 Criar o CANAL 2 - Comandos (o que o ESP32 RECEBE)
+  1) "Channels" > "My Channels" > "New Channel".
+  2) Name:  ReAlimenta Comandos
+  3) Field 1: Setpoint comando (C)
+     Field 2: Modo comando (0 auto, 1 ligado, 2 desligado)
+  4) "Save Channel".
+  5) Anote o "Channel ID" e, na aba "API Keys", a "Write API Key".
+  POR QUE 2 CANAIS? O plano gratuito só aceita 1 atualização a cada 15 s
+  por canal. Separando, um comando seu não é perdido por coincidir com
+  o envio de dados do ESP32.
+
+2.3 Criar o DISPOSITIVO MQTT (a "identidade" do ESP32)
+  1) No menu superior: "Devices" > "MQTT".
+  2) Clique em "Add a new device".
+  3) Name: ESP32 Camara Fria
+  4) Em "Authorize channels to access": escolha o Canal 1 na lista e
+     clique "Add Channel"; escolha o Canal 2 e clique "Add Channel".
+     (os DOIS precisam estar na lista)
+  5) Clique em "Add Device".
+  6) Aparece uma janela com Username, Client ID e Password.
+     COPIE OS TRÊS AGORA e clique em "Download credentials". A senha
+     só aparece uma vez.
+  DEU CERTO QUANDO: o dispositivo aparece na lista de "Devices > MQTT".
+
+2.4 (Opcional, 1 minuto) Testar o canal
+  Cole no navegador (troque a chave pela Write API Key do Canal 1):
+    https://api.thingspeak.com/update?api_key=SUA_CHAVE&field1=4
+  O navegador mostra um número (1, 2, 3...). Volte ao canal: apareceu
+  um ponto no gráfico do Field 1. Se mostrar 0, espere 15 s e repita.
+
+---------------------------------------------------------------------
+PARTE 3 - RODAR O DISPOSITIVO NO WOKWI (no navegador, sem instalar nada)
+---------------------------------------------------------------------
+3.1 Preparar os arquivos
+  1) Baixe e descompacte o arquivo realimenta-iot.zip no seu computador.
+  2) Dentro dele existe a pasta "wokwi-web". São ESTES arquivos que
+     você vai usar:
+       sketch.ino, config.h, types.h, sensor.h/.cpp, actuator.h/.cpp,
+       buttons.h/.cpp, display_ui.h/.cpp, connectivity.h/.cpp,
+       watchdog.h/.cpp, secrets.h, diagram.json, libraries.txt
+
+3.2 Preencher as credenciais (ANTES de subir)
+  1) Abra o arquivo wokwi-web/secrets.h no Bloco de Notas.
+  2) Troque os valores entre aspas:
+       MQTT_CLIENT_ID  -> o Client ID que você copiou
+       MQTT_USER       -> o Username
+       MQTT_PASS       -> a Password
+       TS_CH_TELEMETRY -> ID do Canal 1 (entre aspas, só números)
+       TS_CH_COMMANDS  -> ID do Canal 2
+     NÃO mexa em WIFI_SSID ("Wokwi-GUEST"), WIFI_PASS (vazio) nem
+     WIFI_CHANNEL: é a rede de internet que o Wokwi oferece.
+  3) Salve.
+
+3.3 Criar o projeto no Wokwi
+  1) Em wokwi.com, clique em "New Project" (ou "Start a new project").
+  2) Escolha a placa "ESP32" e a linguagem/framework Arduino
+     (não escolha MicroPython nem Rust). Se houver "Blank/Em branco",
+     use essa.
+  3) Abrirá o editor: à esquerda o código (abas), à direita o desenho
+     do circuito.
+
+3.4 Colocar os arquivos no projeto
+  1) Perto das abas de arquivos há um botão "+" e uma setinha "v" com
+     o menu de arquivos. Procure a opção "Upload file(s)" e selecione
+     TODOS os arquivos da pasta wokwi-web de uma vez
+     (Ctrl+A na janela de seleção). Se perguntar se quer substituir
+     sketch.ino, diagram.json e libraries.txt, aceite.
+  2) Se não achar o upload: crie cada arquivo no "+" com o NOME EXATO
+     e cole o conteúdo (abra cada um no Bloco de Notas, Ctrl+A, Ctrl+C).
+     Para diagram.json e libraries.txt, apenas substitua o conteúdo
+     das abas que já existem.
+  DEU CERTO QUANDO: aparecem as abas sketch.ino, config.h, types.h,
+  sensor.cpp, ... e o circuito mostra o ESP32, o sensor, a tela OLED,
+  3 botões, 4 LEDs e um buzzer.
+
+3.5 Iniciar a simulação
+  1) Clique no botão verde "Start the simulation" (triângulo).
+  2) Na primeira vez, o Wokwi baixa as bibliotecas e compila
+     (pode levar 1 a 2 minutos).
+  3) A parte de baixo mostra o monitor serial (texto). Você deve ver:
+       [BOOT] ReAlimenta IoT | motivo do reset: POWER
+       [SENS] T=4.0C U=60.0% periodo=2000.000ms estado=NORMAL ...
+  4) A tela OLED mostra a temperatura grande, "Cooler", "WiFi" e "MQTT".
+  DEU CERTO QUANDO: a tela mostra "WiFi:OK MQTT:OK" (leva até uns
+  10 s) e, em ~20 s, a serial escreve "[MQTT] telemetria enviada".
+
+3.6 Mexer na simulação
+  - Mudar a temperatura: clique no sensor azul (DHT22) no desenho e
+    arraste o controle "Temperature".
+      abaixo de 5 C  = NORMAL (LED verde)
+      5 a 8 C        = ATENÇÃO (LED amarelo, cooler liga)
+      8 C ou mais    = CRÍTICO (LED vermelho pisca + buzzer)
+  - Cooler (LED azul): liga quando a temperatura sobe e desliga quando
+    desce (com folga de 0,5 C para não ficar ligando/desligando).
+  - Botão verde (MODO): AUTO -> LIGADO -> DESLIGADO.
+  - Botão azul (PÁGINA): troca a tela do display.
+  - Botão vermelho (FALHA REDE): 1 clique derruba o MQTT, 2 cliques
+    derrubam o WiFi, 3 cliques normalizam (serve para o vídeo).
+
+---------------------------------------------------------------------
+PARTE 4 - CONFERIR OS DADOS NA NUVEM
+---------------------------------------------------------------------
+  1) Com a simulação rodando, espere ~1 minuto.
+  2) No ThingSpeak, abra "ReAlimenta Telemetria" (Private View).
+  3) Os gráficos devem ganhar pontos a cada ~20 s (atualize a página).
+  DEU CERTO QUANDO: Field 1 (temperatura) mostra pontos novos.
+  Isso comprova ENVIO MQTT e PERSISTÊNCIA dos dados (o ThingSpeak
+  guarda tudo; você também pode baixar em CSV).
+  Se não aparecer nada, vá para a PARTE 9.
+  ATENÇÃO: deixe a simulação PARADA quando não estiver usando
+  (botão quadrado). O plano gratuito tem limite anual de mensagens.
+
+---------------------------------------------------------------------
+PARTE 5 - NODE-RED (O DASHBOARD)
+---------------------------------------------------------------------
+5.1 Instalar o Node.js
+  1) Entre em https://nodejs.org e baixe a versão "LTS".
+  2) Execute o instalador (Next, Next, Install).
+  3) Abra o "Prompt de Comando" (tecla Windows, digite cmd, Enter) e
+     digite:  node -v     -> deve mostrar um número de versão.
+
+5.2 Instalar e iniciar o Node-RED
+  1) No Prompt de Comando:
+       npm install -g --unsafe-perm node-red
+     (demora alguns minutos; avisos em amarelo são normais)
+  2) Para iniciar:   node-red
+     NÃO feche essa janela enquanto usar o Node-RED.
+  3) Abra no navegador:  http://127.0.0.1:1880
+  DEU CERTO QUANDO: aparece o editor com uma área de fluxos em branco.
+
+5.3 Instalar o painel (dashboard)
+  1) Canto superior direito: menu (três barrinhas) > "Manage palette".
+  2) Aba "Install" > pesquise  node-red-dashboard  > "install" >
+     confirme. Feche a janela.
+  DEU CERTO QUANDO: surgem nós "ui_gauge" etc. na lista da esquerda
+  e o menu superior ganha uma aba "Dashboard".
+
+5.4 Importar o fluxo do projeto
+  1) Menu (três barrinhas) > "Import" > "select a file to import" >
+     escolha  nodered/flows.json  (da pasta descompactada) > "Import".
+  2) Clique duas vezes no nó "CONFIGURAÇÃO" e edite os valores:
+       chTelemetry: ID do Canal 1
+       readKey: deixe '' se o canal for público. Se o gráfico não
+                carregar, pegue a "Read API Key" (aba API Keys do
+                Canal 1) e cole aqui.
+       chCommands: ID do Canal 2
+       writeKeyCommands: Write API Key do Canal 2
+     Clique "Done".
+  3) Clique no botão vermelho "Deploy" (canto superior direito).
+  4) Abra o painel:  http://127.0.0.1:1880/ui
+  DEU CERTO QUANDO: o painel mostra a temperatura, o gráfico, o estado
+  e "ONLINE (último dado há Xs)" com a simulação rodando.
+  (Se o nome do painel "Câmara fria" não aparecer, use o menu
+  Dashboard para escolher a aba.)
+
+---------------------------------------------------------------------
+PARTE 6 - TESTAR COMANDO REMOTO E DESCONEXÃO
+---------------------------------------------------------------------
+6.1 Comando remoto
+  1) No painel, arraste o "Setpoint remoto" para 2.0 e SOLTE.
+     (o comando é enviado ao soltar)
+  2) Em até alguns segundos a serial do Wokwi mostra:
+       [CMD] setpoint = 2.0C
+     e na página 2 do display (botão azul) aparece Setpoint: 2.0C.
+  3) No "Modo do cooler", escolha "Ligado": o LED azul acende e a serial
+     mostra [CMD] modo = LIGADO. Volte para "Automático" depois.
+  Regra do ThingSpeak: comandos com menos de 15 s entre si no mesmo
+  canal são ignorados. Espere 15 s entre um e outro.
+
+6.2 Desconexão (necessária para o vídeo)
+  1) Clique uma vez no botão vermelho: o display mostra "MQTT:OFF SIM".
+  2) Clique de novo: "WiFi:OFF MQTT:OFF SIM". O dispositivo continua
+     medindo e controlando o cooler.
+  3) Espere mais de 60 s: no painel do Node-RED, o dispositivo aparece
+     como "OFFLINE (sem dados há ...)".
+  4) Clique mais uma vez: tudo volta (WiFi:OK MQTT:OK).
+
+---------------------------------------------------------------------
+PARTE 7 - GRAVAR O VÍDEO (gravação de tela)
+---------------------------------------------------------------------
+Ferramenta: OBS Studio (https://obsproject.com, gratuito) ou a Barra de
+Jogos do Windows (Win + G). Grave a tela inteira, com o Wokwi de um lado
+e o painel do Node-RED do outro (duas janelas lado a lado).
+
+Roteiro (ensaie uma vez antes):
+  1) Mostrar a simulação rodando e a tela OLED. Falar o que o projeto
+     faz (monitorar a câmara fria de quem doa alimentos).
+  2) Mudar a temperatura no DHT22: 4 -> 6 -> 9 -> 3 C. A cada passo,
+     mostrar o display, os LEDs, o cooler e o alarme.
+  3) Mostrar o painel Node-RED atualizando (espere até 20 s).
+  4) Mudar o setpoint e o modo pelo painel e mostrar o efeito no
+     display e na serial.
+  5) Clicar no botão vermelho: mostrar "MQTT:OFF" e depois "WiFi:OFF"
+     no display; mostrar o painel indicando OFFLINE; restaurar.
+  6) (Opcional) Watchdog: veja o README (opção -DWDT_TEST_HANG; só
+     funciona com a versão PlatformIO).
+Salve o vídeo (MP4) e confira se o som e a imagem estão bons.
+
+---------------------------------------------------------------------
+PARTE 8 - README E ENTREGA
+---------------------------------------------------------------------
+  1) Abra README.md e preencha os nomes e RMs dos integrantes.
+  2) No Wokwi, clique em "Save" para salvar o projeto na sua conta e
+     copie o link do projeto (compartilhar). Cole o link no README.
+  3) Tire um print do circuito (o arquivo diagram.json também conta
+     como "arquivo de diagrama da simulação").
+  4) GitHub: crie um repositório (github.com > New repository) e use
+     "Add file > Upload files" para enviar o conteúdo da pasta
+     realimenta-iot. 
+  5) CUIDADO COM SENHAS: no GitHub, NÃO envie o secrets.h com as suas
+     credenciais reais. Envie só secrets.example.h (já está no .gitignore).
+     No projeto do Wokwi, quem tem o link pode ver o secrets.h; por isso
+     crie o dispositivo MQTT só para este trabalho e, depois da nota,
+     apague-o no ThingSpeak (Devices > MQTT).
+  6) Entregue conforme as instruções do professor: link do GitHub, link
+     do Wokwi, vídeo e README.
+
+CHECKLIST FINAL
+  [ ] Sensor lido com amostragem fixa de 2 s
+  [ ] Cooler (atuador) liga/desliga pela lógica do dispositivo
+  [ ] Display mostra valor, status do cooler e WiFi/MQTT
+  [ ] Dados chegam ao ThingSpeak e ficam guardados
+  [ ] Comando remoto (setpoint/modo) funciona
+  [ ] Dashboard Node-RED mostra os dados
+  [ ] Vídeo mostra alteração de valores, dashboard, display e
+      desconexão WiFi/MQTT
+  [ ] README com integrantes, código, diagrama, contexto, tela local e
+      descrição dos canais/dispositivo
+
+---------------------------------------------------------------------
+PARTE 9 - SE ALGO DER ERRADO
+---------------------------------------------------------------------
+SINTOMA: fio vermelho / erro de pino no diagrama do Wokwi.
+  Causa: o nome de um pino da placa pode ser diferente. Clique no fio,
+  apague e ligue de novo ao pino certo (GND, 3V3, GPIO indicados na
+  tabela do README). Os GNDs podem ir a qualquer pino GND da placa.
+
+SINTOMA: erro de compilação "No such file ... .h" ou biblioteca.
+  Confira se libraries.txt tem as 5 linhas (PubSubClient, DHT sensor
+  library, Adafruit Unified Sensor, Adafruit SSD1306, Adafruit GFX
+  Library) e se todos os .h/.cpp foram enviados.
+  Copie a mensagem de erro INTEIRA e me mande que eu corrijo.
+
+SINTOMA: erro "#error Copie include/secrets.example.h ...".
+  O arquivo secrets.h não foi enviado ao Wokwi. Envie/crie esse arquivo.
+
+SINTOMA: display mostra "WiFi:OFF" e não conecta.
+  Espere até ~15 s. Confirme WIFI_SSID "Wokwi-GUEST" e senha vazia.
+  Pare e inicie a simulação de novo.
+
+SINTOMA: "WiFi:OK MQTT:OFF" (não conecta ao MQTT).
+  Verifique em secrets.h: Client ID, Username e Password sem espaços
+  extras; o dispositivo MQTT autorizado nos DOIS canais; se a senha foi
+  perdida, no ThingSpeak gere uma nova (Devices > MQTT > seu
+  dispositivo). Se você apertou o botão vermelho, clique até "SIM"
+  sumir da tela.
+
+SINTOMA: conectou, mas o ThingSpeak não recebe dados.
+  Os IDs dos canais em secrets.h precisam ser os números certos, entre
+  aspas. Espere 20 s; o primeiro envio acontece após o primeiro período.
+
+SINTOMA: o comando do painel não chega no ESP32.
+  - Espere 15 s entre comandos.
+  - Confirme o ID e a Write API Key do Canal 2 no nó CONFIGURAÇÃO.
+  - Confira no Node-RED, na aba de debug (inseto) a resposta do
+    ThingSpeak: número maior que 0 = aceito; 0 = recusado.
+  - O envio por HTTP deve chegar ao ESP32 via MQTT. Se não chegar,
+    me avise: existe alternativa de publicar o comando direto por MQTT.
+
+SINTOMA: Node-RED mostra "SEM DADOS" ou nada no gráfico.
+  Canal privado: preencha readKey. Confira o ID do Canal 1. Veja se a
+  simulação está rodando e se já enviou dados.
+
+SINTOMA: "node-red" não é reconhecido.
+  Feche e abra o Prompt de Comando de novo; se persistir, reinstale o
+  Node.js e repita o passo 5.2.
+
+PEDIR AJUDA: mande para mim (1) em qual passo parou, (2) o texto do
+erro ou um print. Com isso eu consigo corrigir rápido.
+
+GLOSSÁRIO RÁPIDO
+  Broker = servidor MQTT (aqui, mqtt3.thingspeak.com).
+  Publicar/Assinar = enviar mensagem / receber mensagens de um tópico.
+  Setpoint = temperatura-alvo do cooler.
+  Histerese = folga para o cooler não ligar e desligar sem parar.
+  Watchdog = "cão de guarda": reinicia o chip se o programa travar.
+  Debounce = filtro que ignora o "tremor" elétrico ao apertar botão.
