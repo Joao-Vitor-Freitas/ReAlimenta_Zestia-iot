@@ -150,4 +150,5 @@ O histórico fica no ThingSpeak e pode ser baixado: `https://api.thingspeak.com/
 - Sem rede, os envios do período são descartados (não há fila de reenvio).
 - Credenciais em `secrets.h`; num produto real, usar provisionamento seguro e TLS (porta 8883).
 
-## ⚠️ Se ainda sobrar dúvidas de como utilizar, instalar ou criar uma conta nas respectivas plataformas de rede. Tem o arquivo **GUIA_PASSO_A_PASSO.txt**, para auxiliá-lo.
+## ⚠️ Atenção ⚠️ 
+### Se ainda sobrar dúvidas de como utilizar, instalar ou criar uma conta nas respectivas plataformas de rede. Tem o arquivo **GUIA_PASSO_A_PASSO.txt**, para auxiliá-lo.
