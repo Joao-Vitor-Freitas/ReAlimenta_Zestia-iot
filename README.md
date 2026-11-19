@@ -1,4 +1,4 @@
-# ReAlimenta IoT — monitor de câmara fria (ESP32 + Wokwi + ThingSpeak)
+# ReAlimenta_Zestia IoT — monitor de câmara fria (ESP32 + Wokwi + ThingSpeak)
 
 Entrega de **Edge Computing & Computer Systems** — FIAP Global Solution 2026.2 (CitizenTech) — Grupo Orion.
 
@@ -6,13 +6,13 @@ Entrega de **Edge Computing & Computer Systems** — FIAP Global Solution 2026.2
 
 | Nome | RM |
 |---|---|
-| João Vitor Dutra de Freitas | _preencher_ |
-| _preencher_ | _preencher_ |
-| _preencher_ | _preencher_ |
+| João Vitor Dutra de Freitas | 573678 |
+| João Victor Sant'Ana Cortabitart | 573865 |
+| João Victor Barbon Naymayer |  574025 |
 
 ## Contextualização
 
-O **ReAlimenta** conecta organizações para doar e solicitar alimentos. Alimentos perecíveis só podem ser oferecidos com segurança se foram bem conservados. Este dispositivo monitora a **temperatura da câmara fria de quem doa** e a mantém na faixa correta, enviando os dados à nuvem para análise.
+O **Zestia** conecta organizações para doar e solicitar alimentos. Alimentos perecíveis só podem ser oferecidos com segurança se foram bem conservados. Este dispositivo monitora a **temperatura da câmara fria de quem doa** e a mantém na faixa correta, enviando os dados à nuvem para análise.
 
 Faixas de operação (escopo do projeto):
 
@@ -60,11 +60,11 @@ O diagrama da simulação está em **`diagram.json`** (abra no Wokwi).
 | MQTT: envio e recepção | `src/connectivity.cpp`: publica telemetria e assina o canal de comandos. |
 | Plataforma back end com persistência | **ThingSpeak** (canais guardam o histórico; exportável em CSV/JSON). |
 | Configuração/acionamento remoto | Setpoint e modo do cooler, pelo canal de comandos. Valores fora do limite são recusados. |
-| Dashboard | **Node-RED** (`nodered/flows.json`), pois o front-end do ReAlimenta não exibe dados do dispositivo. |
+| Dashboard | **Node-RED** (`nodered/flows.json`), pois o front-end do Zestia não exibe dados do dispositivo. |
 
 ## Plataforma IoT: ThingSpeak
 
-**Canal 1 — "ReAlimenta Telemetria"** (dispositivo → nuvem), um envio a cada 20 s com a **média do período** (dado já processado na borda):
+**Canal 1 — "ReAlimenta_Zestia Telemetria"** (dispositivo → nuvem), um envio a cada 20 s com a **média do período** (dado já processado na borda):
 
 | Campo | Conteúdo |
 |---|---|
@@ -77,7 +77,7 @@ O diagrama da simulação está em **`diagram.json`** (abra no Wokwi).
 | field7 | Temperatura máxima no período (°C) |
 | field8 | Sinal WiFi (RSSI, dBm) |
 
-**Canal 2 — "ReAlimenta Comandos"** (dashboard → dispositivo): `field1` = setpoint (0 a 6 °C) · `field2` = modo (0, 1 ou 2).
+**Canal 2 — "ReAlimenta_Zestia Comandos"** (dashboard → dispositivo): `field1` = setpoint (0 a 6 °C) · `field2` = modo (0, 1 ou 2).
 Foram usados dois canais porque o plano gratuito aceita 1 atualização a cada 15 s por canal; assim um comando não é perdido por coincidir com o envio de telemetria.
 
 **Dispositivo MQTT (device):** `mqtt3.thingspeak.com:1883`, autenticado por Client ID, usuário e senha do dispositivo, autorizado a publicar no Canal 1 e a assinar o Canal 2.
@@ -135,13 +135,6 @@ WiFi:OK MQTT:OK                   <- status de conexão (OFF quando caiu; "SIM" 
 - **Botões:** interrupção `FALLING` + debounce por tempo dentro da ISR (50 ms); a ISR só enfileira o evento, tratado no `loop()`.
 - **Reconexão sem travar:** máquina de estados WiFi → MQTT com intervalos de tentativa. Sem rede, o dispositivo **continua medindo e controlando** o cooler localmente. O `connect()` do MQTT tem tempo limite de 3 s, menor que o watchdog.
 
-## Roteiro da gravação do vídeo (tela do simulador + dashboard)
-1. **Operação normal:** simulação rodando, display na página 0, serial com `[SENS]` e `periodo=2000.000ms`.
-2. **Alterar valores:** com o DHT22, leve a temperatura 4 → 6 → 9 → 3 °C. Mostre a cada passo o **display**, os LEDs, o cooler e o buzzer.
-3. **Dashboard:** aguarde o envio (até 20 s) e mostre o Node-RED atualizando, com o gráfico.
-4. **Configuração remota:** no dashboard, mude o setpoint (ex.: 2,0 °C) e o modo; mostre `[CMD]` na serial e a página 1 do display.
-5. **Desconexão:** botão FALHA REDE: 1º clique, display `MQTT:OFF`; 2º clique, `WiFi:OFF`. Aguarde mais de 60 s para o dashboard mostrar **OFFLINE**, enquanto o display continua medindo. 3º clique: volta ao ONLINE.
-6. **(Opcional) Watchdog:** build com `-DWDT_TEST_HANG` e o reset com `Rst:WDT`.
 
 ## Dados para o programa em Python
 O histórico fica no ThingSpeak e pode ser baixado: `https://api.thingspeak.com/channels/<ID_CANAL_1>/feeds.csv?results=8000` (acrescente `&api_key=<READ_KEY>` se o canal for privado).
@@ -156,3 +149,5 @@ O histórico fica no ThingSpeak e pode ser baixado: `https://api.thingspeak.com/
 - O botão FALHA REDE existe só para a demonstração; num produto real seria removido.
 - Sem rede, os envios do período são descartados (não há fila de reenvio).
 - Credenciais em `secrets.h`; num produto real, usar provisionamento seguro e TLS (porta 8883).
+
+## ⚠️ Se ainda sobrar dúvidas de como utilizar, instalar ou criar uma conta nas respectivas plataformas de rede. Tem o arquivo **GUIA_PASSO_A_PASSO.txt**, para auxiliá-lo.
