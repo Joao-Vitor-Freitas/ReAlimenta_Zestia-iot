@@ -14,7 +14,8 @@ static LinkState linkState = LinkState::WIFI_DOWN;
 static FaultSim fault = FaultSim::NONE;
 static CommandHandler handler = nullptr;
 static uint32_t lastWifiTry = 0, lastMqttTry = 0;
-static bool wifiStarted = false;
+static bool wifiStarted = false, wifiWasUp = false;
+static uint32_t mqttRetryMs = MQTT_RETRY_MS;
 static char topicPublish[64], topicSetpoint[80], topicMode[80];
 
 // Recepção de configuração: ThingSpeak entrega o valor do campo como texto puro.
@@ -43,7 +44,8 @@ void connectivityBegin(CommandHandler h) {
   WiFi.setAutoReconnect(false);  // a reconexão é controlada pela máquina de estados
   mqtt.setServer(MQTT_HOST, MQTT_PORT);
   mqtt.setCallback(onMessage);
-  mqtt.setSocketTimeout(3);  // limita o bloqueio do connect() (watchdog = 10 s)
+  netClient.setTimeout(2);   // limita o bloqueio do connect() (watchdog = 10 s)
+  mqtt.setSocketTimeout(2);
   mqtt.setKeepAlive(30);
 }
 
@@ -56,6 +58,7 @@ void connectivityLoop(uint32_t now) {
   }
   if (WiFi.status() != WL_CONNECTED) {
     linkState = LinkState::WIFI_DOWN;
+    wifiWasUp = false;
     if (!wifiStarted || now - lastWifiTry >= WIFI_RETRY_MS) {
       lastWifiTry = now;
       wifiStarted = true;
@@ -63,6 +66,7 @@ void connectivityLoop(uint32_t now) {
     }
     return;
   }
+  if (!wifiWasUp) { wifiWasUp = true; mqttRetryMs = MQTT_RETRY_MS; lastMqttTry = 0; }  // WiFi voltou: tenta o MQTT já
   if (fault == FaultSim::MQTT_BLOCKED) {  // falha simulada: WiFi ok, broker inacessível
     if (mqtt.connected()) mqtt.disconnect();
     linkState = LinkState::MQTT_DOWN;
@@ -70,12 +74,16 @@ void connectivityLoop(uint32_t now) {
   }
   if (!mqtt.connected()) {
     linkState = LinkState::MQTT_DOWN;
-    if (now - lastMqttTry >= MQTT_RETRY_MS) {
+    if (now - lastMqttTry >= mqttRetryMs) {
       lastMqttTry = now;
       if (mqtt.connect(MQTT_CLIENT_ID, MQTT_USER, MQTT_PASS)) {
         mqtt.subscribe(topicSetpoint);
         mqtt.subscribe(topicMode);
         linkState = LinkState::ONLINE;
+        mqttRetryMs = MQTT_RETRY_MS;
+      } else {  // espera crescente entre tentativas: 5 s, 10 s, 15 s
+        uint32_t next = mqttRetryMs * 2;
+        mqttRetryMs = next > MQTT_RETRY_MAX_MS ? MQTT_RETRY_MAX_MS : next;
       }
     }
     return;
@@ -93,6 +101,7 @@ void connectivityCycleFault() {
         : fault == FaultSim::MQTT_BLOCKED ? FaultSim::WIFI_BLOCKED : FaultSim::NONE;
   lastWifiTry = 0;
   lastMqttTry = 0;
+  mqttRetryMs = MQTT_RETRY_MS;
 }
 
 // field1 temp média | field2 umidade média | field3 cooler | field4 setpoint | field5 modo

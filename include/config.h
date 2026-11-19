@@ -21,7 +21,8 @@ constexpr uint32_t DISPLAY_PERIOD_MS = 250;
 constexpr uint32_t DEBOUNCE_MS       = 50;
 constexpr uint32_t WDT_TIMEOUT_S     = 10;
 constexpr uint32_t WIFI_RETRY_MS     = 8000;
-constexpr uint32_t MQTT_RETRY_MS     = 5000;
+constexpr uint32_t MQTT_RETRY_MS     = 5000;   // 1a nova tentativa de MQTT
+constexpr uint32_t MQTT_RETRY_MAX_MS = 15000;  // espera crescente (5 s, 10 s, 15 s) para bloquear menos o loop
 constexpr uint32_t ALARM_BLINK_MS    = 400;
 constexpr uint8_t  SENSOR_FAIL_SAMPLES = 3;    // leituras inválidas seguidas até declarar falha
 

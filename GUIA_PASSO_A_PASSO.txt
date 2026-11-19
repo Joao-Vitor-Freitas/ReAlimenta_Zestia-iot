@@ -213,7 +213,7 @@ PARTE 5 - NODE-RED (O DASHBOARD)
 
 5.2 Instalar e iniciar o Node-RED
   1) No Prompt de Comando:
-       npm install -g --unsafe-perm node-red
+       npm install -g node-red
      (demora alguns minutos; avisos em amarelo são normais)
   2) Para iniciar:   node-red
      NÃO feche essa janela enquanto usar o Node-RED.
